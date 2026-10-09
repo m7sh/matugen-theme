@@ -3,6 +3,14 @@
 # whenever the wallpaper changes. Started at login from hypr/autostart.lua.
 set -uo pipefail
 
+export PATH="$HOME/.local/bin:$PATH"
+
+# Ensure only one instance of matugen-watch runs
+exec 9>"${XDG_RUNTIME_DIR:-/tmp}/matugen-watch.lock"
+if ! flock -n 9; then
+  exit 0
+fi
+
 DIR="$HOME/.local/state/omarchy/current"
 SYNC="$HOME/.local/bin/matugen-omarchy"
 

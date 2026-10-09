@@ -57,59 +57,68 @@ omarchy theme bg next
 
 ## 🚀 Installation & Activation
 
-### Option 1: Standard Omarchy Theme Install
+The installer is completely automated, non-destructive, and works safely within user space (`~/.config/` and `~/.local/`). It never touches `/usr/share/omarchy/`, so your system stays 100% clean across `omarchy update`s.
 
-Install directly via Omarchy's theme installer:
+### Quick Install (One-Liner)
+
+Run the automated installer directly in your terminal:
 
 ```bash
-omarchy theme install https://github.com/m7sh/matugen-theme.git
+git clone https://github.com/m7sh/matugen-theme.git /tmp/matugen-theme && /tmp/matugen-theme/install.sh
 ```
 
-### Option 2: Full Dynamic Material You Setup
+### Manual Install
 
-To enable real-time dynamic palette generation on wallpaper change:
+If you prefer to clone and inspect before running:
 
-1. **Install Prerequisites**:
-   ```bash
-   # Install matugen and inotify-tools
-   cargo install matugen # or: yay -S matugen-bin
-   sudo pacman -S inotify-tools
-   ```
+```bash
+git clone https://github.com/m7sh/matugen-theme.git
+cd matugen-theme
+./install.sh
+```
 
-2. **Clone & Run Installer**:
-   ```bash
-   git clone https://github.com/m7sh/matugen-theme.git ~/.config/omarchy/themes/matugen
-   cd ~/.config/omarchy/themes/matugen
-   ./install.sh
-   ```
+### What the Installer Does Automatically
 
-3. **Apply the Theme**:
-   ```bash
-   omarchy theme set matugen
-   ```
+1. **Matugen Check/Install**: Installs the latest prebuilt `matugen` binary to `~/.local/bin/` if not already installed (no sudo required).
+2. **Theme Deployment**: Installs the theme and all 7 4K wallpapers into `~/.config/omarchy/themes/matugen/`.
+3. **Template Setup**: Deploys dynamic Material You templates into `~/.config/matugen/templates/`.
+4. **Automation Scripts**: Installs `matugen-omarchy`, `matugen-watch`, and `matugen-sync` into `~/.local/bin/`.
+5. **Omarchy Hook**: Registers an Omarchy `theme-set` hook to immediately adapt colors whenever the theme is applied.
+6. **Daemon & Autostart**: Sets up and starts the `matugen-watch.service` systemd user service and registers it in `~/.config/hypr/autostart.lua`.
+7. **Immediate Activation**: Automatically switches your desktop to the Matugen theme.
 
-4. **Enable Wallpaper Watcher**:
-   Add the watcher to your `~/.config/hypr/autostart.lua`:
-   ```lua
-   o.launch_on_start(os.getenv("HOME") .. "/.local/bin/matugen-watch")
-   ```
-   Or start it in the background:
-   ```bash
-   ~/.local/bin/matugen-watch &
-   ```
+---
 
-## ⌨️ Useful Commands
+## ⌨️ Usage & Useful Commands
 
-- **Cycle Background**:
+- **Cycle Wallpapers (with automatic real-time re-theming)**:
   ```bash
   omarchy theme bg next
   ```
-- **Force Palette Regeneration**:
+- **Manually Force Palette Regeneration**:
   ```bash
   matugen-omarchy
   ```
-- **Restart Desktop Shell / Terminals**:
+- **Check Wallpaper Daemon Status**:
+  ```bash
+  systemctl --user status matugen-watch.service
+  ```
+- **Restart Desktop Shell / Terminals (if needed)**:
   ```bash
   omarchy restart shell
   omarchy restart terminal
   ```
+- **Switch back to Matugen from another theme**:
+  ```bash
+  omarchy theme set matugen
+  ```
+
+---
+
+## 🗑️ Uninstallation
+
+To cleanly remove the theme, service, and scripts without touching any core Omarchy configuration:
+
+```bash
+./install.sh --uninstall
+```

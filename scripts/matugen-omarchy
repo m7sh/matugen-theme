@@ -7,6 +7,8 @@
 # feed back into the watcher).
 set -euo pipefail
 
+export PATH="$HOME/.local/bin:$PATH"
+
 THEME="matugen"
 THEME_NAME_FILE="$HOME/.local/state/omarchy/current/theme.name"
 BACKGROUND_LINK="$HOME/.local/state/omarchy/current/background"

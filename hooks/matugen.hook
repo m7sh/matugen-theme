@@ -1,0 +1,16 @@
+#!/bin/bash
+# Omarchy theme-set hook for matugen dynamic palette generation
+set -euo pipefail
+
+[[ ${OMARCHY_THEME_SKIP_BACKGROUND:-} == "1" ]] && exit 0
+[[ "${1:-}" == "matugen" ]] || exit 0
+
+export PATH="$HOME/.local/bin:$PATH"
+
+# Ensure matugen-watch is running in background
+if ! pgrep -f "matugen-watch" >/dev/null 2>&1; then
+  nohup "$HOME/.local/bin/matugen-watch" >/dev/null 2>&1 &
+fi
+
+# Regenerate palette from the newly set background
+"$HOME/.local/bin/matugen-omarchy" || true

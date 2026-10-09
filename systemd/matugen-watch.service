@@ -1,0 +1,15 @@
+[Unit]
+Description=Matugen dynamic wallpaper watcher for Omarchy
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/matugen-watch
+Restart=always
+RestartSec=3
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin
+Environment=XDG_RUNTIME_DIR=%t
+
+[Install]
+WantedBy=graphical-session.target
