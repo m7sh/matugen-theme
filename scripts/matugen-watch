@@ -1,0 +1,19 @@
+#!/bin/bash
+# Watch Omarchy's current-background symlink and regenerate the matugen theme
+# whenever the wallpaper changes. Started at login from hypr/autostart.lua.
+set -uo pipefail
+
+DIR="$HOME/.local/state/omarchy/current"
+SYNC="$HOME/.local/bin/matugen-omarchy"
+
+mkdir -p "$DIR"
+
+# Omarchy swaps the background with `ln -nsf`, which surfaces as a MOVED_TO of
+# "background" (via a temp file). Ignore the other churn in this directory
+# (theme/ and next-theme/ during a theme switch).
+inotifywait -m -q -e moved_to -e create -e delete --format '%f' "$DIR" |
+  while read -r name; do
+    [[ $name == background ]] || continue
+    sleep 0.5
+    "$SYNC"
+  done

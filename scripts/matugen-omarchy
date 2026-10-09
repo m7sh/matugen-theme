@@ -1,0 +1,31 @@
+#!/bin/bash
+# Regenerate the Omarchy "matugen" theme palette from the current wallpaper and
+# re-apply it. Safe to run by hand or from matugen-watch.
+#
+# The wallpaper is left untouched: OMARCHY_THEME_SKIP_BACKGROUND stops
+# `omarchy theme set` from cycling to the next background (which would otherwise
+# feed back into the watcher).
+set -euo pipefail
+
+THEME="matugen"
+THEME_NAME_FILE="$HOME/.local/state/omarchy/current/theme.name"
+BACKGROUND_LINK="$HOME/.local/state/omarchy/current/background"
+MATUGEN_CONFIG="$HOME/.config/matugen/config.toml"
+
+# Only drive the matugen theme; leave any other active theme alone.
+[[ -f $THEME_NAME_FILE ]] || exit 0
+[[ $(<"$THEME_NAME_FILE") == "$THEME" ]] || exit 0
+
+background=$(readlink -f "$BACKGROUND_LINK" 2>/dev/null || true)
+[[ -f $background ]] || exit 0
+
+# Serialize runs: one `ln -nsf` wallpaper swap can emit several inotify events.
+exec 8>"${XDG_RUNTIME_DIR:-/tmp}/matugen-omarchy.lock"
+flock 8
+
+if ! matugen image "$background" -c "$MATUGEN_CONFIG" -m dark --quiet; then
+  omarchy-notification-send "matugen: could not generate a palette" -t 3000 || true
+  exit 1
+fi
+
+OMARCHY_THEME_SKIP_BACKGROUND=1 omarchy theme set "$THEME" >/dev/null

@@ -1,0 +1,246 @@
+#!/usr/bin/env python3
+"""
+matugen-sync: Synchronize desktop colors with wallpaper using Matugen for Omarchy.
+"""
+
+import sys
+import os
+import argparse
+import json
+import subprocess
+import colorsys
+
+THEME_DIR = os.path.expanduser("~/.config/omarchy/themes/matugen")
+BACKGROUNDS_DIR = os.path.join(THEME_DIR, "backgrounds")
+CURRENT_BG_LINK = os.path.expanduser("~/.local/state/omarchy/current/background")
+CURRENT_THEME_FILE = os.path.expanduser("~/.local/state/omarchy/current/theme.name")
+
+def hex_to_rgb(h):
+    h = h.lstrip("#")
+    return tuple(int(h[i:i+2], 16) / 255.0 for i in (0, 2, 4))
+
+def rgb_to_hex(rgb):
+    return "#{:02x}{:02x}{:02x}".format(*(int(round(c * 255)) for c in rgb))
+
+def harmonize_color(hue_deg, ref_hex, min_sat=0.40, max_sat=0.70, min_val=0.80, max_val=0.96):
+    r, g, b = hex_to_rgb(ref_hex)
+    _, s, v = colorsys.rgb_to_hsv(r, g, b)
+    s = max(min_sat, min(s, max_sat))
+    v = max(min_val, min(v, max_val))
+    return rgb_to_hex(colorsys.hsv_to_rgb(hue_deg / 360.0, s, v))
+
+def get_current_background():
+    if os.path.islink(CURRENT_BG_LINK):
+        return os.path.realpath(CURRENT_BG_LINK)
+    return None
+
+def get_theme_backgrounds():
+    if not os.path.isdir(BACKGROUNDS_DIR):
+        return []
+    exts = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+    files = [
+        os.path.join(BACKGROUNDS_DIR, f)
+        for f in os.listdir(BACKGROUNDS_DIR)
+        if os.path.splitext(f)[1].lower() in exts
+    ]
+    files.sort()
+    return files
+
+def get_next_background():
+    bgs = get_theme_backgrounds()
+    if not bgs:
+        return None
+    current = get_current_background()
+    current_name = os.path.basename(current) if current else ""
+    for idx, b in enumerate(bgs):
+        if os.path.basename(b) == current_name:
+            return bgs[(idx + 1) % len(bgs)]
+    return bgs[0]
+
+def generate_colors_toml(image_path, scheme_type="scheme-tonal-spot"):
+    cmd = [
+        "matugen", "image", image_path,
+        "--dry-run", "--source-color-index", "0",
+        "-t", scheme_type,
+        "-j", "hex"
+    ]
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    if res.returncode != 0:
+        raise RuntimeError(f"Matugen error: {res.stderr.strip()}")
+
+    data = json.loads(res.stdout)
+    c = data["colors"]
+    p = data["palettes"]
+
+    primary = c["primary"]["default"]["color"]
+    secondary = c["secondary"]["default"]["color"]
+    tertiary = c["tertiary"]["default"]["color"]
+    error = c["error"]["default"]["color"]
+    surface = c["surface"]["default"]["color"]
+    surface_low = c["surface_container_low"]["default"]["color"]
+    surface_lowest = c["surface_container_lowest"]["default"]["color"]
+    surface_high = c["surface_container_high"]["default"]["color"]
+    surface_highest = c["surface_container_highest"]["default"]["color"]
+    outline = c["outline"]["default"]["color"]
+    on_surface = c["on_surface"]["default"]["color"]
+    on_surface_variant = c["on_surface_variant"]["default"]["color"]
+
+    red = error
+    green = harmonize_color(135, primary)
+    yellow = harmonize_color(45, primary)
+    blue = harmonize_color(215, primary)
+    magenta = secondary
+    cyan = tertiary
+    orange = harmonize_color(28, primary)
+    brown = harmonize_color(15, tertiary)
+
+    bright_red = p["error"].get("70", {}).get("color", red)
+    bright_green = harmonize_color(135, secondary)
+    bright_yellow = harmonize_color(48, secondary)
+    bright_blue = harmonize_color(210, secondary)
+    bright_magenta = c["secondary_container"]["default"]["color"]
+    bright_cyan = c["tertiary_container"]["default"]["color"]
+
+    p_clean = primary.lstrip("#")
+    s_clean = secondary.lstrip("#")
+    active_border = f"rgba({p_clean}bb) rgba({s_clean}66) 45deg"
+    inactive_border = "rgba(00000000)"
+
+    return f"""# Matugen Material You theme for Omarchy
+# Generated dynamically from {os.path.basename(image_path)}
+mode = "dark"
+
+accent = "{primary}"
+focus_red = "{error}"
+selection = "{surface_highest}"
+selection_background = "{surface_highest}"
+selection_foreground = "{on_surface}"
+muted = "{outline}"
+
+background = "{surface}"
+dark_background = "{surface_low}"
+darker_background = "{surface_lowest}"
+lighter_background = "{surface_high}"
+
+foreground = "{on_surface}"
+dark_foreground = "{on_surface_variant}"
+light_foreground = "{on_surface}"
+bright_foreground = "#ffffff"
+cursor = "{primary}"
+
+red = "{red}"
+green = "{green}"
+yellow = "{yellow}"
+blue = "{blue}"
+magenta = "{magenta}"
+cyan = "{cyan}"
+orange = "{orange}"
+brown = "{brown}"
+
+bright_red = "{bright_red}"
+bright_green = "{bright_green}"
+bright_yellow = "{bright_yellow}"
+bright_blue = "{bright_blue}"
+bright_magenta = "{bright_magenta}"
+bright_cyan = "{bright_cyan}"
+
+hyprland_active_border = "{active_border}"
+hyprland_inactive_border = "{inactive_border}"
+
+color0 = "{surface_high}"
+color1 = "{red}"
+color2 = "{green}"
+color3 = "{yellow}"
+color4 = "{blue}"
+color5 = "{magenta}"
+color6 = "{cyan}"
+color7 = "{on_surface}"
+color8 = "{outline}"
+color9 = "{bright_red}"
+color10 = "{bright_green}"
+color11 = "{bright_yellow}"
+color12 = "{bright_blue}"
+color13 = "{bright_magenta}"
+color14 = "{bright_cyan}"
+color15 = "{on_surface}"
+"""
+
+def sync_theme(wallpaper_path, scheme_type="scheme-tonal-spot", set_bg=True):
+    if not os.path.isfile(wallpaper_path):
+        print(f"Error: Wallpaper not found at '{wallpaper_path}'", file=sys.stderr)
+        sys.exit(1)
+
+    wallpaper_path = os.path.abspath(wallpaper_path)
+    print(f"Adapting colors from: {os.path.basename(wallpaper_path)}")
+
+    # 1. Update background link if requested
+    if set_bg:
+        subprocess.run(["omarchy-theme-bg-set", wallpaper_path], check=False)
+
+    # 2. Generate colors.toml
+    content = generate_colors_toml(wallpaper_path, scheme_type)
+    colors_file = os.path.join(THEME_DIR, "colors.toml")
+    with open(colors_file, "w") as f:
+        f.write(content)
+    print(f"Updated: {colors_file}")
+
+    # 3. Apply theme if active or requested
+    active_theme = ""
+    if os.path.isfile(CURRENT_THEME_FILE):
+        with open(CURRENT_THEME_FILE) as f:
+            active_theme = f.read().strip()
+
+    if active_theme.lower() == "matugen":
+        print("Re-applying Matugen theme across system...")
+        subprocess.run(["omarchy", "theme", "set", "matugen"], check=False)
+
+    # 4. Notify user
+    bg_name = os.path.basename(wallpaper_path)
+    subprocess.run(
+        ["notify-send", "-a", "Omarchy Matugen", "Theme Synced", f"Colors adapted to {bg_name}"],
+        check=False
+    )
+    print("Done!")
+
+def main():
+    parser = argparse.ArgumentParser(description="Synchronize Matugen theme colors with wallpapers")
+    parser.add_argument("wallpaper", nargs="?", help="Path to wallpaper image")
+    parser.add_argument("-n", "--next", action="store_true", help="Cycle to next wallpaper in theme")
+    parser.add_argument("-l", "--list", action="store_true", help="List all theme wallpapers")
+    parser.add_argument("-t", "--type", default="scheme-tonal-spot", help="Matugen scheme type")
+    parser.add_argument("--no-set-bg", action="store_true", help="Generate colors without switching current background")
+
+    args = parser.parse_args()
+
+    if args.list:
+        bgs = get_theme_backgrounds()
+        print(f"Available wallpapers ({len(bgs)}):")
+        current = get_current_background()
+        current_name = os.path.basename(current) if current else ""
+        for b in bgs:
+            mark = " * (current)" if os.path.basename(b) == current_name else ""
+            print(f"  - {os.path.basename(b)}{mark}")
+        return
+
+    target_bg = None
+    if args.next:
+        target_bg = get_next_background()
+        if not target_bg:
+            print("No wallpapers found in theme backgrounds directory.", file=sys.stderr)
+            sys.exit(1)
+    elif args.wallpaper:
+        target_bg = args.wallpaper
+    else:
+        target_bg = get_current_background()
+        if not target_bg:
+            bgs = get_theme_backgrounds()
+            target_bg = bgs[0] if bgs else None
+
+    if not target_bg:
+        print("Error: No wallpaper specified and no current background active.", file=sys.stderr)
+        sys.exit(1)
+
+    sync_theme(target_bg, scheme_type=args.type, set_bg=not args.no_set_bg)
+
+if __name__ == "__main__":
+    main()

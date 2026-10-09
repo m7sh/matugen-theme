@@ -1,0 +1,44 @@
+# Matugen configuration for Omarchy.
+#
+# Generates the "matugen" Omarchy theme's colors.toml from the current
+# wallpaper. Omarchy then expands that palette into every app it themes
+# (terminals, bar, Hyprland, btop, neovim, ...).
+#
+# Driven automatically by ~/.local/bin/matugen-watch on wallpaper change, or
+# run ~/.local/bin/matugen-omarchy by hand.
+
+[config]
+version_check = false
+contrast = 0.0
+caching = false
+prefer = "closest-to-fallback"
+fallback_color = "#ffbf9b"
+
+# Fixed-hue seed colours. Matugen harmonises these to the wallpaper so terminal
+# ANSI colours stay recognisable while still matching the generated palette.
+[config.custom_colors]
+red = "#f38ba8"
+orange = "#fab387"
+yellow = "#f9e2af"
+green = "#a6e3a1"
+cyan = "#94e2d5"
+blue = "#89b4fa"
+magenta = "#cba6f7"
+brown = "#a1705a"
+
+[templates.omarchy-colors]
+input_path = "~/.config/matugen/templates/omarchy-colors.toml"
+output_path = "~/.config/omarchy/themes/matugen/colors.toml"
+
+[templates.hyprland]
+input_path = "~/.config/matugen/templates/hyprland.lua"
+output_path = "~/.config/omarchy/themes/matugen/hyprland.lua"
+
+[templates.cava]
+input_path = "~/.config/matugen/templates/cava-theme"
+output_path = "~/.config/cava/themes/matugen"
+
+[templates.shell]
+input_path = "~/.config/matugen/templates/shell.toml"
+output_path = "~/.config/omarchy/themes/matugen/shell.toml"
+
