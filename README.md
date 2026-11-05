@@ -65,6 +65,8 @@ Two silent 2560×1440 H.264 loops ship with the theme:
 
 They loop for about a minute, carry no audio track, and are encoded at 1440p because OWE renders at most `2560×1440` by default (`owe config`). The palette for each is sampled automatically from the video, so no poster is needed.
 
+The repository ships 2560×1440 copies to keep the clone small. `install.sh` places them in `~/.config/omarchy/backgrounds/matugen/` and uses `cp -n`, so a same-named full-resolution original you already have there is never overwritten. Drop your own 4K originals in that folder if you prefer.
+
 `omarchy theme bg next` cycles them together with the stills.
 
 ## 📹 Live Wallpapers
@@ -133,7 +135,7 @@ cd matugen-theme
 ### What the Installer Does Automatically
 
 1. **Matugen Check/Install**: Installs the latest prebuilt `matugen` binary to `~/.local/bin/` if not already installed (no sudo required).
-2. **Theme Deployment**: Installs the theme, its 7 4K stills and 2 live videos into `~/.config/omarchy/themes/matugen/`, keeping any live wallpapers you added there.
+2. **Theme Deployment**: Installs the theme's 7 4K stills into `~/.config/omarchy/themes/matugen/` and the live videos into `~/.config/omarchy/backgrounds/matugen/`, never overwriting a same-named file so a local 4K original survives updates.
 3. **Template Setup**: Deploys dynamic Material You templates into `~/.config/matugen/templates/`.
 4. **Automation Scripts**: Installs `matugen-omarchy`, `matugen-watch`, `matugen-sync` and `matugen-frame` into `~/.local/bin/`.
 5. **Dependency Checks**: Verifies `inotify-tools` for the watcher and `ffmpeg` for sampling live wallpapers.

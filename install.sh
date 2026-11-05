@@ -12,6 +12,7 @@ BIN_DIR="$HOME/.local/bin"
 SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
 HOOKS_DIR="$HOME/.config/omarchy/hooks/theme-set.d"
 HYPR_AUTOSTART="$HOME/.config/hypr/autostart.lua"
+USER_BACKGROUNDS_DIR="$HOME/.config/omarchy/backgrounds/matugen"
 
 GREEN="\033[0;32m"
 BLUE="\033[0;34m"
@@ -129,10 +130,24 @@ mkdir -p "$HOME/.config/omarchy/themes"
 if [[ -d "$THEME_DIR" && "$THEME_DIR" != "$SCRIPT_DIR" ]]; then
   find "$THEME_DIR" -mindepth 1 -maxdepth 1 ! -name backgrounds -exec rm -rf -- {} + 2>/dev/null || true
 fi
-mkdir -p "$THEME_DIR/backgrounds"
 
-# Copy wallpapers and theme metadata
-cp -r "$SCRIPT_DIR/backgrounds/"* "$THEME_DIR/backgrounds/"
+# Copy still wallpapers into the theme. Live videos go into Omarchy's user
+# background folder instead: theme staging copies the whole theme directory on
+# every palette refresh, so large clips would be copied over and over. `cp -n`
+# also keeps a same-named local file, such as a full 4K original, instead of
+# overwriting it with the smaller copy shipped in this repo.
+mkdir -p "$THEME_DIR/backgrounds" "$USER_BACKGROUNDS_DIR"
+for entry in "$SCRIPT_DIR/backgrounds/"*; do
+  [[ -e "$entry" ]] || continue
+  case "${entry,,}" in
+    *.mp4 | *.m4v | *.mov | *.webm | *.mkv | *.avi)
+      cp -n "$entry" "$USER_BACKGROUNDS_DIR/"
+      ;;
+    *)
+      cp "$entry" "$THEME_DIR/backgrounds/"
+      ;;
+  esac
+done
 for file in icons.theme preview.png unlock.png hyprlock.conf cava_theme colors.toml hyprland.lua shell.toml; do
   if [[ -f "$SCRIPT_DIR/$file" ]]; then
     cp "$SCRIPT_DIR/$file" "$THEME_DIR/"
