@@ -12,7 +12,7 @@ A dynamic Material You wallpaper-driven theming suite and curated dark anime aes
 - **Whisper Window Borders**: Feather-light 1px 45° gradient transitioning from glowing primary accent to subtle translucent highlights, with a seamless borderless transparent inactive frame.
 - **Dynamic Geometry**: Clean tiling geometry (`rounding = 6`, `gaps = 0`) paired with refined floating window curves (`rounding = 8` for dialogs, modals, and pickers).
 - **Deep Obsidian Canvas**: `#13140c` rich OLED-friendly dark base with high contrast typography and clean Quickshell status bar integration.
-- **Curated 4K Anime Wallpapers**: Includes 7 high-definition dark anime and cyberpunk wallpapers tailored for instant palette harmony.
+- **Curated 4K Anime Wallpapers**: Includes 7 high-definition dark anime and cyberpunk stills plus 2 looping live wallpapers, tailored for instant palette harmony.
 - **Complete App Coverage**: Themed Hyprland, Quickshell, Cava, Alacritty, Kitty, Foot, Ghostty, Neovim, Helix, Btop, and Obsidian.
 
 ![Unlock](unlock.png)
@@ -55,6 +55,17 @@ Cycle wallpapers at any time with:
 ```bash
 omarchy theme bg next
 ```
+
+### Live wallpapers included
+
+Two silent 2560×1440 H.264 loops ship with the theme:
+
+1. `samurai-over-sakura-valley-live.mp4` — a samurai overlooking a misty sakura valley at sunset.
+2. `tokyo-skyline-bedroom-live.mp4` — a rain-streaked Tokyo apartment with the skyline at night.
+
+They loop for about a minute, carry no audio track, and are encoded at 1440p because OWE renders at most `2560×1440` by default (`owe config`). The palette for each is sampled automatically from the video, so no poster is needed.
+
+`omarchy theme bg next` cycles them together with the stills.
 
 ## 📹 Live Wallpapers
 
@@ -122,7 +133,7 @@ cd matugen-theme
 ### What the Installer Does Automatically
 
 1. **Matugen Check/Install**: Installs the latest prebuilt `matugen` binary to `~/.local/bin/` if not already installed (no sudo required).
-2. **Theme Deployment**: Installs the theme and all 7 4K wallpapers into `~/.config/omarchy/themes/matugen/`, keeping any live wallpapers you added there.
+2. **Theme Deployment**: Installs the theme, its 7 4K stills and 2 live videos into `~/.config/omarchy/themes/matugen/`, keeping any live wallpapers you added there.
 3. **Template Setup**: Deploys dynamic Material You templates into `~/.config/matugen/templates/`.
 4. **Automation Scripts**: Installs `matugen-omarchy`, `matugen-watch`, `matugen-sync` and `matugen-frame` into `~/.local/bin/`.
 5. **Dependency Checks**: Verifies `inotify-tools` for the watcher and `ffmpeg` for sampling live wallpapers.

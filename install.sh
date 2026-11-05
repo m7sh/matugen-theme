@@ -138,7 +138,7 @@ for file in icons.theme preview.png unlock.png hyprlock.conf cava_theme colors.t
     cp "$SCRIPT_DIR/$file" "$THEME_DIR/"
   fi
 done
-log_success "Theme installed to $THEME_DIR (curated stills; live videos are kept)"
+log_success "Theme installed to $THEME_DIR (curated stills and live videos)"
 
 # 6. Install Matugen configuration and templates
 log_info "Installing Matugen configuration and templates..."
