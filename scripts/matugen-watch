@@ -1,9 +1,16 @@
 #!/bin/bash
 # Watch Omarchy's current-background symlink and regenerate the matugen theme
 # whenever the wallpaper changes. Started at login from hypr/autostart.lua.
+# Videos behave like stills here: Omarchy (via OWE) repoints the same symlink,
+# and matugen-frame resolves the video to a still before matugen runs.
 set -uo pipefail
 
 export PATH="$HOME/.local/bin:$PATH"
+
+if ! command -v inotifywait >/dev/null 2>&1; then
+  echo "matugen-watch: inotifywait not found (install inotify-tools)" >&2
+  exit 1
+fi
 
 # Ensure only one instance of matugen-watch runs
 exec 9>"${XDG_RUNTIME_DIR:-/tmp}/matugen-watch.lock"

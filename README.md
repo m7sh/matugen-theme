@@ -7,6 +7,7 @@ A dynamic Material You wallpaper-driven theming suite and curated dark anime aes
 ## ✨ Features
 
 - **Dynamic Material You Generation**: Automatically extracts harmonized color palettes from any active wallpaper using Matugen.
+- **Live Wallpaper Aware**: Omarchy's video wallpapers (`.mp4`, `.webm`, ...) keep driving the palette. Matugen samples a poster or a representative video frame, so colors stay just as accurate as with stills.
 - **Real-Time Wallpaper Watcher**: Inotify-based background daemon instantly re-themes your environment whenever you change or cycle wallpapers.
 - **Whisper Window Borders**: Feather-light 1px 45° gradient transitioning from glowing primary accent to subtle translucent highlights, with a seamless borderless transparent inactive frame.
 - **Dynamic Geometry**: Clean tiling geometry (`rounding = 6`, `gaps = 0`) paired with refined floating window curves (`rounding = 8` for dialogs, modals, and pickers).
@@ -55,6 +56,47 @@ Cycle wallpapers at any time with:
 omarchy theme bg next
 ```
 
+## 📹 Live Wallpapers
+
+Omarchy 4.5 draws video backgrounds through OWE. Matugen still needs a still image, so the theme now resolves one automatically before every palette generation:
+
+1. **Poster image (recommended)** — put `foo.jpg`, `foo.png` or `foo.webp` next to `foo.mp4`. The poster wins and gives you a stable, hand-picked palette.
+2. **Automatic frame grab** — with no poster, `ffmpeg` samples a frame at 20% of the video (clamped to 0.2–8 seconds) and caches it in `~/.cache/matugen/frames/`.
+
+Supported videos: `.mp4`, `.m4v`, `.mov`, `.webm`, `.mkv`, `.avi` (the same list Omarchy cycles through). GIF and WebP stills keep working exactly as before.
+
+### Add a live wallpaper
+
+Drop videos into the user background folder, which survives theme updates and is **not** copied on every palette refresh:
+
+```bash
+omarchy theme bg install        # opens ~/.config/omarchy/backgrounds/matugen
+```
+
+Then cycle through stills and videos together:
+
+```bash
+omarchy theme bg next
+omarchy theme bg set ~/Videos/wallpaper.mp4
+```
+
+The watcher notices the change, samples the video, regenerates `colors.toml`, and re-applies the theme — the desktop, bar and terminals recolour themselves.
+
+> **Tip:** A video placed inside the theme directory
+> (`~/.config/omarchy/themes/matugen/backgrounds/`) also works, and the installer now
+> preserves that folder on update, but Omarchy copies the whole theme directory on
+> every palette refresh, so large clips are better kept in the user background folder.
+
+### Tune the sampled frame
+
+```bash
+MATUGEN_FRAME_TIME=4.5 matugen-omarchy     # sample 4.5s into the current video
+```
+
+`matugen-frame <path>` prints the exact still Matugen would use, which is handy for debugging a video that produces an unexpected palette.
+
+`ffmpeg` and `ffprobe` are required for live wallpapers; the installer checks for them and installs them with `pacman` when it can.
+
 ## 🚀 Installation & Activation
 
 The installer is completely automated, non-destructive, and works safely within user space (`~/.config/` and `~/.local/`). It never touches `/usr/share/omarchy/`, so your system stays 100% clean across `omarchy update`s.
@@ -80,12 +122,13 @@ cd matugen-theme
 ### What the Installer Does Automatically
 
 1. **Matugen Check/Install**: Installs the latest prebuilt `matugen` binary to `~/.local/bin/` if not already installed (no sudo required).
-2. **Theme Deployment**: Installs the theme and all 7 4K wallpapers into `~/.config/omarchy/themes/matugen/`.
+2. **Theme Deployment**: Installs the theme and all 7 4K wallpapers into `~/.config/omarchy/themes/matugen/`, keeping any live wallpapers you added there.
 3. **Template Setup**: Deploys dynamic Material You templates into `~/.config/matugen/templates/`.
-4. **Automation Scripts**: Installs `matugen-omarchy`, `matugen-watch`, and `matugen-sync` into `~/.local/bin/`.
-5. **Omarchy Hook**: Registers an Omarchy `theme-set` hook to immediately adapt colors whenever the theme is applied.
-6. **Daemon & Autostart**: Sets up and starts the `matugen-watch.service` systemd user service and registers it in `~/.config/hypr/autostart.lua`.
-7. **Immediate Activation**: Automatically switches your desktop to the Matugen theme.
+4. **Automation Scripts**: Installs `matugen-omarchy`, `matugen-watch`, `matugen-sync` and `matugen-frame` into `~/.local/bin/`.
+5. **Dependency Checks**: Verifies `inotify-tools` for the watcher and `ffmpeg` for sampling live wallpapers.
+6. **Omarchy Hook**: Registers an Omarchy `theme-set` hook to immediately adapt colors whenever the theme is applied.
+7. **Daemon & Autostart**: Sets up and starts the `matugen-watch.service` systemd user service and registers it in `~/.config/hypr/autostart.lua`.
+8. **Immediate Activation**: Automatically switches your desktop to the Matugen theme.
 
 ---
 
@@ -95,9 +138,21 @@ cd matugen-theme
   ```bash
   omarchy theme bg next
   ```
+- **List wallpapers (stills + live videos)**:
+  ```bash
+  matugen-sync --list
+  ```
 - **Manually Force Palette Regeneration**:
   ```bash
   matugen-omarchy
+  ```
+- **Show which still a live wallpaper is sampled from**:
+  ```bash
+  matugen-frame ~/Videos/wallpaper.mp4
+  ```
+- **Try another Material You scheme**:
+  ```bash
+  MATUGEN_SCHEME=scheme-vibrant matugen-omarchy
   ```
 - **Check Wallpaper Daemon Status**:
   ```bash

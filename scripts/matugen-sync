@@ -9,11 +9,17 @@ import argparse
 import json
 import subprocess
 import colorsys
+import shutil
 
 THEME_DIR = os.path.expanduser("~/.config/omarchy/themes/matugen")
 BACKGROUNDS_DIR = os.path.join(THEME_DIR, "backgrounds")
+USER_BACKGROUNDS_DIR = os.path.expanduser("~/.config/omarchy/backgrounds/matugen")
 CURRENT_BG_LINK = os.path.expanduser("~/.local/state/omarchy/current/background")
 CURRENT_THEME_FILE = os.path.expanduser("~/.local/state/omarchy/current/theme.name")
+
+STILL_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"}
+VIDEO_EXTS = {".mp4", ".m4v", ".mov", ".webm", ".mkv", ".avi"}
+MEDIA_EXTS = STILL_EXTS | VIDEO_EXTS
 
 def hex_to_rgb(h):
     h = h.lstrip("#")
@@ -35,14 +41,15 @@ def get_current_background():
     return None
 
 def get_theme_backgrounds():
-    if not os.path.isdir(BACKGROUNDS_DIR):
-        return []
-    exts = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
-    files = [
-        os.path.join(BACKGROUNDS_DIR, f)
-        for f in os.listdir(BACKGROUNDS_DIR)
-        if os.path.splitext(f)[1].lower() in exts
-    ]
+    files = []
+    for directory in (BACKGROUNDS_DIR, USER_BACKGROUNDS_DIR):
+        if not os.path.isdir(directory):
+            continue
+        files.extend(
+            os.path.join(directory, f)
+            for f in os.listdir(directory)
+            if os.path.splitext(f)[1].lower() in MEDIA_EXTS
+        )
     files.sort()
     return files
 
@@ -57,9 +64,30 @@ def get_next_background():
             return bgs[(idx + 1) % len(bgs)]
     return bgs[0]
 
-def generate_colors_toml(image_path, scheme_type="scheme-tonal-spot"):
+def resolve_palette_image(media_path):
+    """Return a still image matugen can sample for a wallpaper.
+
+    Stills pass through. Videos use the sibling poster image when one exists,
+    otherwise the matugen-frame helper extracts a representative frame.
+    """
+    if os.path.splitext(media_path)[1].lower() not in VIDEO_EXTS:
+        return media_path
+
+    helper = shutil.which("matugen-frame") or os.path.expanduser("~/.local/bin/matugen-frame")
+    if not os.path.isfile(helper):
+        raise RuntimeError("matugen-frame helper not found; re-run install.sh")
+
+    res = subprocess.run([helper, media_path], capture_output=True, text=True)
+    frame = res.stdout.strip()
+    if res.returncode != 0 or not frame:
+        raise RuntimeError(res.stderr.strip() or f"Could not sample a frame from {media_path}")
+    return frame
+
+
+def generate_colors_toml(image_path, scheme_type="scheme-tonal-spot", display_name=None):
+    palette_source = resolve_palette_image(image_path)
     cmd = [
-        "matugen", "image", image_path,
+        "matugen", "image", palette_source,
         "--dry-run", "--source-color-index", "0",
         "-t", scheme_type,
         "-j", "hex"
@@ -106,8 +134,9 @@ def generate_colors_toml(image_path, scheme_type="scheme-tonal-spot"):
     active_border = f"rgba({p_clean}bb) rgba({s_clean}66) 45deg"
     inactive_border = "rgba(00000000)"
 
+    label = display_name or os.path.basename(image_path)
     return f"""# Matugen Material You theme for Omarchy
-# Generated dynamically from {os.path.basename(image_path)}
+# Generated dynamically from {label}
 mode = "dark"
 
 accent = "{primary}"
@@ -178,7 +207,9 @@ def sync_theme(wallpaper_path, scheme_type="scheme-tonal-spot", set_bg=True):
         subprocess.run(["omarchy-theme-bg-set", wallpaper_path], check=False)
 
     # 2. Generate colors.toml
-    content = generate_colors_toml(wallpaper_path, scheme_type)
+    content = generate_colors_toml(
+        wallpaper_path, scheme_type, display_name=os.path.basename(wallpaper_path)
+    )
     colors_file = os.path.join(THEME_DIR, "colors.toml")
     with open(colors_file, "w") as f:
         f.write(content)
@@ -192,7 +223,13 @@ def sync_theme(wallpaper_path, scheme_type="scheme-tonal-spot", set_bg=True):
 
     if active_theme.lower() == "matugen":
         print("Re-applying Matugen theme across system...")
-        subprocess.run(["omarchy", "theme", "set", "matugen"], check=False)
+        # Skip Omarchy's background cycling: sync already chose the wallpaper,
+        # and cycling here would silently move to the next one.
+        subprocess.run(
+            ["omarchy", "theme", "set", "matugen"],
+            check=False,
+            env={**os.environ, "OMARCHY_THEME_SKIP_BACKGROUND": "1"},
+        )
 
     # 4. Notify user
     bg_name = os.path.basename(wallpaper_path)

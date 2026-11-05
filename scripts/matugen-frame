@@ -1,0 +1,105 @@
+#!/bin/bash
+# Print a still image path that matugen can sample for the given wallpaper.
+#
+# Still images (jpg, png, gif, webp, ...) are printed unchanged. Videos are
+# resolved to, in order:
+#   1. a poster image next to the video (foo.mp4 -> foo.jpg/.jpeg/.png/.webp),
+#   2. one representative frame extracted with ffmpeg, cached under
+#      ~/.cache/matugen/frames.
+#
+# Omarchy hands video wallpapers to OWE, which draws them on the desktop; the
+# palette still has to come from a still, so this is the bridge between the two.
+#
+# Usage: matugen-frame <wallpaper>
+#
+# Environment:
+#   MATUGEN_FRAME_TIME  Seconds into the video to sample. Defaults to 20% of the
+#                       duration, clamped to 0.2s..8s.
+set -euo pipefail
+
+wallpaper=${1:-}
+[[ -n $wallpaper ]] || {
+  echo "usage: matugen-frame <wallpaper>" >&2
+  exit 2
+}
+wallpaper=$(realpath -- "$wallpaper")
+[[ -f $wallpaper ]] || {
+  echo "not a file: $wallpaper" >&2
+  exit 1
+}
+
+is_video() { [[ ${1,,} =~ \.(mp4|m4v|mov|webm|mkv|avi)$ ]]; }
+
+# Stills (including animated gif/webp) go straight to matugen.
+if ! is_video "$wallpaper"; then
+  printf '%s\n' "$wallpaper"
+  exit 0
+fi
+
+# A curated poster beats a frame grab: it is stable, cheap, and lets the theme
+# author pick the moment that carries the palette they designed around.
+base=${wallpaper%.*}
+for poster in "$base.jpg" "$base.jpeg" "$base.png" "$base.webp"; do
+  if [[ -f $poster ]]; then
+    printf '%s\n' "$poster"
+    exit 0
+  fi
+done
+
+cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/matugen/frames"
+mkdir -p "$cache_dir"
+
+# Serialize extraction so a theme-set hook and the watcher cannot both decode
+# the same video.
+exec 8>"$cache_dir/.lock"
+flock 8
+
+# The staged theme directory is rebuilt on every theme apply, so the same
+# wallpaper can get a new inode and mtime. Key the cache on both.
+signature=$(stat -Lc '%s:%Y' -- "$wallpaper")
+cache_key=$(printf '%s\n%s\n%s\n' "$wallpaper" "$signature" "${MATUGEN_FRAME_TIME:-}" | md5sum | cut -d' ' -f1)
+frame="$cache_dir/$cache_key.png"
+
+if [[ ! -s $frame ]]; then
+  command -v ffmpeg >/dev/null 2>&1 || {
+    echo "ffmpeg is required to sample a video wallpaper" >&2
+    exit 1
+  }
+
+  sample_time=${MATUGEN_FRAME_TIME:-}
+  if [[ -z $sample_time ]]; then
+    duration=$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 -- "$wallpaper" 2>/dev/null || true)
+    sample_time=$(awk -v d="${duration:-0}" 'BEGIN {
+      if (d <= 0) { printf "1"; exit }
+      t = d * 0.2
+      if (t < 0.2) t = 0.2
+      if (t > 8) t = 8
+      printf "%.3f", t
+    }')
+  fi
+
+  tmp="$frame.$$.tmp.png"
+  trap 'rm -f -- "$tmp"' EXIT
+
+  # -nostdin matters under the inotify watcher, which owns the loop's stdin.
+  # A small frame is plenty for palette quantisation and keeps the decode fast
+  # for 4K clips.
+  if ! ffmpeg -nostdin -loglevel error -y -ss "$sample_time" -i "$wallpaper" \
+    -frames:v 1 -an -sn -vf "scale='min(960,iw)':-2:flags=lanczos" "$tmp"; then
+    echo "could not extract a frame from: $wallpaper" >&2
+    exit 1
+  fi
+
+  mv -f -- "$tmp" "$frame"
+  trap - EXIT
+fi
+
+# Keep the cache bounded: every theme switch stages new inodes, so old keys
+# would otherwise accumulate for good.
+find "$cache_dir" -maxdepth 1 -type f -name '*.png' -printf '%T@ %p\n' 2>/dev/null |
+  sort -rn | tail -n +21 | cut -d' ' -f2- |
+  while IFS= read -r old; do
+    [[ -n $old ]] && rm -f -- "$old"
+  done
+
+printf '%s\n' "$frame"

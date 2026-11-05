@@ -40,7 +40,7 @@ if [[ "${1:-}" == "--uninstall" ]]; then
 
   # Remove hooks and scripts
   rm -f "$HOOKS_DIR/matugen.hook"
-  rm -f "$BIN_DIR/matugen-omarchy" "$BIN_DIR/matugen-watch" "$BIN_DIR/matugen-sync"
+  rm -f "$BIN_DIR/matugen-omarchy" "$BIN_DIR/matugen-watch" "$BIN_DIR/matugen-sync" "$BIN_DIR/matugen-frame"
   log_success "Removed helper scripts and hooks"
 
   # Remove theme directory
@@ -92,7 +92,7 @@ else
   exit 1
 fi
 
-# 3. Check for inotifywait (required for real-time wallpaper watching)
+# 3. Check for inotify-tools (required for real-time wallpaper watching)
 log_info "Checking inotify-tools..."
 if ! command -v inotifywait &>/dev/null; then
   if command -v pacman &>/dev/null && (( EUID == 0 || $(sudo -n true 2>/dev/null; echo $?) == 0 )); then
@@ -105,13 +105,29 @@ else
   log_success "inotifywait ready"
 fi
 
-# 4. Install theme files into ~/.config/omarchy/themes/matugen
+# 4. Check for ffmpeg (required to sample colors from live wallpapers)
+log_info "Checking ffmpeg (live wallpaper support)..."
+if ! command -v ffmpeg &>/dev/null || ! command -v ffprobe &>/dev/null; then
+  if command -v pacman &>/dev/null && (( EUID == 0 || $(sudo -n true 2>/dev/null; echo $?) == 0 )); then
+    sudo pacman -S --noconfirm --needed ffmpeg
+  else
+    log_warn "ffmpeg is not installed. Still wallpapers work, but live wallpapers cannot be sampled."
+    echo "  Install via: sudo pacman -S ffmpeg"
+  fi
+else
+  log_success "ffmpeg ready (video wallpapers supported)"
+fi
+
+# 5. Install theme files into ~/.config/omarchy/themes/matugen
 log_info "Installing theme files..."
 mkdir -p "$HOME/.config/omarchy/themes"
 
-# If THEME_DIR exists and is a directory (not this script dir)
+# If THEME_DIR exists and is a directory (not this script dir), clear it but
+# keep backgrounds/: live wallpapers are large files a user added by hand and
+# an update must not throw them away. Omarchy also reads
+# ~/.config/omarchy/backgrounds/matugen, which survives regardless.
 if [[ -d "$THEME_DIR" && "$THEME_DIR" != "$SCRIPT_DIR" ]]; then
-  rm -rf "$THEME_DIR"
+  find "$THEME_DIR" -mindepth 1 -maxdepth 1 ! -name backgrounds -exec rm -rf -- {} + 2>/dev/null || true
 fi
 mkdir -p "$THEME_DIR/backgrounds"
 
@@ -122,24 +138,25 @@ for file in icons.theme preview.png unlock.png hyprlock.conf cava_theme colors.t
     cp "$SCRIPT_DIR/$file" "$THEME_DIR/"
   fi
 done
-log_success "Theme installed to $THEME_DIR (with 7 curated 4K wallpapers)"
+log_success "Theme installed to $THEME_DIR (curated stills; live videos are kept)"
 
-# 5. Install Matugen configuration and templates
+# 6. Install Matugen configuration and templates
 log_info "Installing Matugen configuration and templates..."
 mkdir -p "$MATUGEN_DIR/templates"
 cp "$SCRIPT_DIR/matugen/config.toml" "$MATUGEN_DIR/"
 cp -r "$SCRIPT_DIR/matugen/templates/"* "$MATUGEN_DIR/templates/"
 log_success "Templates installed to $MATUGEN_DIR"
 
-# 6. Install helper scripts
+# 7. Install helper scripts
 log_info "Installing helper scripts to $BIN_DIR..."
 cp "$SCRIPT_DIR/scripts/matugen-omarchy" "$BIN_DIR/"
 cp "$SCRIPT_DIR/scripts/matugen-watch" "$BIN_DIR/"
 cp "$SCRIPT_DIR/scripts/matugen-sync" "$BIN_DIR/"
-chmod +x "$BIN_DIR/matugen-omarchy" "$BIN_DIR/matugen-watch" "$BIN_DIR/matugen-sync"
-log_success "Helper scripts installed (matugen-omarchy, matugen-watch, matugen-sync)"
+cp "$SCRIPT_DIR/scripts/matugen-frame" "$BIN_DIR/"
+chmod +x "$BIN_DIR/matugen-omarchy" "$BIN_DIR/matugen-watch" "$BIN_DIR/matugen-sync" "$BIN_DIR/matugen-frame"
+log_success "Helper scripts installed (matugen-omarchy, matugen-watch, matugen-sync, matugen-frame)"
 
-# 7. Install theme-set hook
+# 8. Install theme-set hook
 log_info "Installing Omarchy theme-set hook..."
 mkdir -p "$HOOKS_DIR"
 if [[ -f "$SCRIPT_DIR/hooks/matugen.hook" ]]; then
@@ -160,7 +177,7 @@ fi
 chmod +x "$HOOKS_DIR/matugen.hook"
 log_success "Hook installed to $HOOKS_DIR/matugen.hook"
 
-# 8. Setup systemd user service
+# 9. Setup systemd user service
 log_info "Setting up systemd user service..."
 mkdir -p "$SYSTEMD_USER_DIR"
 if [[ -f "$SCRIPT_DIR/systemd/matugen-watch.service" ]]; then
@@ -191,7 +208,7 @@ if command -v systemctl &>/dev/null; then
   log_success "Systemd user service enabled & started (matugen-watch.service)"
 fi
 
-# 9. Register in Hyprland autostart
+# 10. Register in Hyprland autostart
 if [[ -f "$HYPR_AUTOSTART" ]]; then
   if ! grep -q "matugen-watch" "$HYPR_AUTOSTART"; then
     log_info "Adding watcher to $HYPR_AUTOSTART..."
@@ -200,7 +217,7 @@ if [[ -f "$HYPR_AUTOSTART" ]]; then
   fi
 fi
 
-# 10. Apply theme now
+# 11. Apply theme now
 if command -v omarchy &>/dev/null; then
   log_info "Applying Matugen theme via Omarchy..."
   omarchy theme set matugen >/dev/null 2>&1 || true

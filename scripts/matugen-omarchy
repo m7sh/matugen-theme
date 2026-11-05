@@ -13,6 +13,8 @@ THEME="matugen"
 THEME_NAME_FILE="$HOME/.local/state/omarchy/current/theme.name"
 BACKGROUND_LINK="$HOME/.local/state/omarchy/current/background"
 MATUGEN_CONFIG="$HOME/.config/matugen/config.toml"
+FRAME_HELPER="$HOME/.local/bin/matugen-frame"
+SCHEME="${MATUGEN_SCHEME:-scheme-tonal-spot}"
 
 # Only drive the matugen theme; leave any other active theme alone.
 [[ -f $THEME_NAME_FILE ]] || exit 0
@@ -25,7 +27,19 @@ background=$(readlink -f "$BACKGROUND_LINK" 2>/dev/null || true)
 exec 8>"${XDG_RUNTIME_DIR:-/tmp}/matugen-omarchy.lock"
 flock 8
 
-if ! matugen image "$background" -c "$MATUGEN_CONFIG" -m dark --quiet; then
+# Omarchy draws video wallpapers through OWE, but matugen still needs a still.
+# matugen-frame passes stills through and resolves videos to a sibling poster
+# (foo.mp4 -> foo.jpg) or a representative frame, so live wallpapers keep
+# feeding the palette exactly like images do.
+source_image="$background"
+if [[ -x $FRAME_HELPER ]]; then
+  if ! source_image=$("$FRAME_HELPER" "$background"); then
+    omarchy-notification-send "matugen: could not read the current wallpaper" -t 3000 || true
+    exit 1
+  fi
+fi
+
+if ! matugen image "$source_image" -c "$MATUGEN_CONFIG" -m dark -t "$SCHEME" --quiet; then
   omarchy-notification-send "matugen: could not generate a palette" -t 3000 || true
   exit 1
 fi
