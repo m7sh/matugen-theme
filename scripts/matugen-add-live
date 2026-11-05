@@ -1,0 +1,110 @@
+#!/bin/bash
+# Add a video wallpaper to the matugen theme and silence it by default.
+#
+# The clip is copied into Omarchy's user background folder, where it survives
+# theme updates and is not copied on every palette refresh. Its audio track is
+# removed with matugen-silence, which copies the video stream bit-for-bit.
+# The watcher then samples the new wallpaper and retints the desktop.
+#
+# Usage: matugen-add-live [--set] [--keep-audio] [--force] <video>
+set -euo pipefail
+
+export PATH="$HOME/.local/bin:$PATH"
+
+USER_BACKGROUNDS_DIR="$HOME/.config/omarchy/backgrounds/matugen"
+SILENCE="$HOME/.local/bin/matugen-silence"
+if [[ ! -x $SILENCE ]]; then
+  SILENCE="$(dirname "$(realpath -- "${BASH_SOURCE[0]}")")/matugen-silence"
+fi
+
+set_wallpaper=0
+keep_audio=0
+force=0
+
+usage() {
+  cat <<'EOF'
+usage: matugen-add-live [--set] [--keep-audio] [--force] <video>
+
+  --set          make the clip the current wallpaper (rethemes immediately)
+  --keep-audio   leave the audio track in place (muted by default)
+  --force        overwrite a same-named file in the background folder
+EOF
+}
+
+while (($#)); do
+  case $1 in
+    --set) set_wallpaper=1 ;;
+    --keep-audio) keep_audio=1 ;;
+    --force | -f) force=1 ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*)
+      echo "unknown option: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+    *) break ;;
+  esac
+  shift
+done
+
+source_video=${1:-}
+[[ -n $source_video ]] || {
+  usage >&2
+  exit 2
+}
+source_video=$(realpath -- "$source_video")
+[[ -f $source_video ]] || {
+  echo "not a file: $source_video" >&2
+  exit 1
+}
+
+case "${source_video,,}" in
+  *.mp4 | *.m4v | *.mov | *.webm | *.mkv | *.avi) ;;
+  *)
+    echo "not a video: $source_video" >&2
+    exit 1
+    ;;
+esac
+
+destination="$USER_BACKGROUNDS_DIR/$(basename -- "$source_video")"
+source_real=$(realpath -m -- "$source_video")
+destination_real=$(realpath -m -- "$destination")
+
+if [[ -e $destination && $source_real != "$destination_real" && $force -ne 1 ]]; then
+  echo "already exists: $destination" >&2
+  echo "use --force to replace it" >&2
+  exit 1
+fi
+
+mkdir -p "$USER_BACKGROUNDS_DIR"
+
+if [[ $keep_audio -eq 1 ]]; then
+  if [[ $source_real != "$destination_real" ]]; then
+    cp -- "$source_video" "$destination"
+  fi
+else
+  if [[ ! -x $SILENCE ]]; then
+    echo "matugen-silence not found; re-run install.sh" >&2
+    exit 1
+  fi
+  "$SILENCE" "$source_video" "$destination" >/dev/null
+fi
+
+echo "Added: $destination"
+if [[ $keep_audio -eq 0 ]]; then
+  echo "Audio stripped (video stream copied, not re-encoded)."
+fi
+
+if [[ $set_wallpaper -eq 1 ]]; then
+  omarchy theme bg set "$destination"
+  echo "Set as the current wallpaper."
+else
+  echo "Apply it with: omarchy theme bg set '$destination'"
+fi

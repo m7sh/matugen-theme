@@ -1,0 +1,83 @@
+#!/bin/bash
+# Remove the audio track from a video wallpaper without re-encoding the video.
+#
+# OWE plays a video wallpaper's audio if the file has a track, and there is no
+# per-wallpaper mute switch. Keeping theme wallpapers silent therefore means
+# keeping their files silent. The video stream is copied bit-for-bit, so this
+# is a remux, not a compression.
+#
+# Usage:
+#   matugen-silence <video>          replace the file in place
+#   matugen-silence <video> <output> write a silent copy
+set -euo pipefail
+
+input=${1:-}
+output=${2:-}
+
+usage() {
+  echo "usage: matugen-silence <video> [output]" >&2
+  exit 2
+}
+
+[[ -n $input ]] || usage
+input=$(realpath -- "$input")
+[[ -f $input ]] || {
+  echo "not a file: $input" >&2
+  exit 1
+}
+
+case "${input,,}" in
+  *.mp4 | *.m4v | *.mov | *.webm | *.mkv | *.avi) ;;
+  *)
+    echo "not a video: $input" >&2
+    exit 1
+    ;;
+esac
+
+command -v ffmpeg >/dev/null 2>&1 || {
+  echo "ffmpeg is required" >&2
+  exit 1
+}
+command -v ffprobe >/dev/null 2>&1 || {
+  echo "ffprobe is required" >&2
+  exit 1
+}
+
+if [[ -z $(ffprobe -v error -select_streams v:0 -show_entries stream=index -of csv=p=0 -- "$input") ]]; then
+  echo "no video stream: $input" >&2
+  exit 1
+fi
+
+has_audio=$(ffprobe -v error -select_streams a:0 -show_entries stream=index -of csv=p=0 -- "$input")
+if [[ -z $has_audio ]]; then
+  # Already muted. Copy only when a separate destination was requested.
+  if [[ -n $output && $(realpath -m -- "$output") != "$input" ]]; then
+    cp -- "$input" "$output"
+  fi
+  printf '%s\n' "${output:-$input}"
+  exit 0
+fi
+
+if [[ -z $output ]]; then
+  output=$input
+fi
+output_dir=$(dirname -- "$output")
+mkdir -p "$output_dir"
+extension=${output##*.}
+tmp=$(mktemp "$output_dir/.matugen-silence.XXXXXX.$extension")
+trap 'rm -f -- "$tmp"' EXIT
+
+movflags=()
+case "${output,,}" in
+  *.mp4 | *.m4v | *.mov) movflags=(-movflags +faststart) ;;
+esac
+
+if ! ffmpeg -nostdin -loglevel error -y -i "$input" \
+  -map 0:v -c:v copy -an -map_metadata -1 "${movflags[@]}" "$tmp"; then
+  echo "could not strip audio from: $input" >&2
+  exit 1
+fi
+
+mv -f -- "$tmp" "$output"
+trap - EXIT
+printf '%s\n' "$output"

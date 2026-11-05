@@ -65,19 +65,19 @@ Two silent 2560×1440 H.264 loops ship with the theme:
 
 They loop for about a minute, carry no audio track, and are encoded at 1440p because OWE renders at most `2560×1440` by default (`owe config`). The palette for each is sampled automatically from the video, so no poster is needed.
 
-The repository ships 2560×1440 copies to keep the clone small. `install.sh` places them in `~/.config/omarchy/backgrounds/matugen/` and uses `cp -n`, so a same-named full-resolution original you already have there is never overwritten. Drop your own 4K originals in that folder if you prefer.
+The repository ships 2560×1440 copies to keep the clone small. `install.sh` places them in `~/.config/omarchy/backgrounds/matugen/`, keeps a same-named full-resolution original you already have there, and silences any newly installed clip. Drop your own 4K originals in that folder if you prefer.
 
 `omarchy theme bg next` cycles them together with the stills.
 
 ## 📹 Live Wallpapers
 
-Live wallpapers are silent: the two clips shipped here have no audio track. OWE deliberately plays the audio of any video wallpaper that has one, so strip it before adding your own:
+Live wallpapers are silent by default. OWE deliberately plays the audio of any video wallpaper that has one, and has no per-wallpaper mute switch, so the theme keeps its clips silent at the file level. `matugen-add-live` and the installer strip audio automatically; the video stream is copied bit-for-bit. To silence an existing file yourself:
 
 ```bash
-ffmpeg -i input.mp4 -map 0:v -c:v copy -an output.mp4
+matugen-silence ~/Videos/loop.mp4
 ```
 
-`-c:v copy` keeps the video stream bit-for-bit, so nothing is re-encoded.
+The command replaces the file in place (or takes an output path) without re-encoding the video.
 
 Omarchy 4.5 draws video backgrounds through OWE. Matugen still needs a still image, so the theme now resolves one automatically before every palette generation:
 
@@ -88,7 +88,13 @@ Supported videos: `.mp4`, `.m4v`, `.mov`, `.webm`, `.mkv`, `.avi` (the same list
 
 ### Add a live wallpaper
 
-Drop videos into the user background folder, which survives theme updates and is **not** copied on every palette refresh:
+Use the helper. It copies the clip into the user background folder, strips its audio track, and can make it the current wallpaper:
+
+```bash
+matugen-add-live --set ~/Videos/loop.mp4
+```
+
+Use `--keep-audio` to keep a track, or `--force` to replace a same-named clip. Videos can also be dropped into the folder directly, which survives theme updates and is **not** copied on every palette refresh:
 
 ```bash
 omarchy theme bg install        # opens ~/.config/omarchy/backgrounds/matugen
@@ -143,9 +149,9 @@ cd matugen-theme
 ### What the Installer Does Automatically
 
 1. **Matugen Check/Install**: Installs the latest prebuilt `matugen` binary to `~/.local/bin/` if not already installed (no sudo required).
-2. **Theme Deployment**: Installs the theme's 7 4K stills into `~/.config/omarchy/themes/matugen/` and the live videos into `~/.config/omarchy/backgrounds/matugen/`, never overwriting a same-named file so a local 4K original survives updates.
+2. **Theme Deployment**: Installs the theme's 7 4K stills into `~/.config/omarchy/themes/matugen/` and the live videos into `~/.config/omarchy/backgrounds/matugen/`, never overwriting a same-named file so a local 4K original survives updates. Newly installed clips are silenced automatically.
 3. **Template Setup**: Deploys dynamic Material You templates into `~/.config/matugen/templates/`.
-4. **Automation Scripts**: Installs `matugen-omarchy`, `matugen-watch`, `matugen-sync` and `matugen-frame` into `~/.local/bin/`.
+4. **Automation Scripts**: Installs `matugen-omarchy`, `matugen-watch`, `matugen-sync`, `matugen-frame`, `matugen-add-live` and `matugen-silence` into `~/.local/bin/`.
 5. **Dependency Checks**: Verifies `inotify-tools` for the watcher and `ffmpeg` for sampling live wallpapers.
 6. **Omarchy Hook**: Registers an Omarchy `theme-set` hook to immediately adapt colors whenever the theme is applied.
 7. **Daemon & Autostart**: Sets up and starts the `matugen-watch.service` systemd user service and registers it in `~/.config/hypr/autostart.lua`.

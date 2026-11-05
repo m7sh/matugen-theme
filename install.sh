@@ -41,7 +41,7 @@ if [[ "${1:-}" == "--uninstall" ]]; then
 
   # Remove hooks and scripts
   rm -f "$HOOKS_DIR/matugen.hook"
-  rm -f "$BIN_DIR/matugen-omarchy" "$BIN_DIR/matugen-watch" "$BIN_DIR/matugen-sync" "$BIN_DIR/matugen-frame"
+  rm -f "$BIN_DIR/matugen-omarchy" "$BIN_DIR/matugen-watch" "$BIN_DIR/matugen-sync" "$BIN_DIR/matugen-frame" "$BIN_DIR/matugen-add-live" "$BIN_DIR/matugen-silence"
   log_success "Removed helper scripts and hooks"
 
   # Remove theme directory
@@ -133,15 +133,23 @@ fi
 
 # Copy still wallpapers into the theme. Live videos go into Omarchy's user
 # background folder instead: theme staging copies the whole theme directory on
-# every palette refresh, so large clips would be copied over and over. `cp -n`
-# also keeps a same-named local file, such as a full 4K original, instead of
-# overwriting it with the smaller copy shipped in this repo.
+# every palette refresh, so large clips would be copied over and over. A
+# same-named local file, such as a full 4K original, is never overwritten.
+# Newly installed clips are routed through matugen-silence, so future repo
+# videos stay muted even if they were committed with an audio track.
 mkdir -p "$THEME_DIR/backgrounds" "$USER_BACKGROUNDS_DIR"
 for entry in "$SCRIPT_DIR/backgrounds/"*; do
   [[ -e "$entry" ]] || continue
   case "${entry,,}" in
     *.mp4 | *.m4v | *.mov | *.webm | *.mkv | *.avi)
-      cp -n "$entry" "$USER_BACKGROUNDS_DIR/"
+      destination="$USER_BACKGROUNDS_DIR/${entry##*/}"
+      if [[ -e $destination ]]; then
+        log_info "Keeping existing $(basename -- "$destination")"
+      elif [[ -x "$SCRIPT_DIR/scripts/matugen-silence" ]]; then
+        "$SCRIPT_DIR/scripts/matugen-silence" "$entry" "$destination" >/dev/null
+      else
+        cp "$entry" "$destination"
+      fi
       ;;
     *)
       cp "$entry" "$THEME_DIR/backgrounds/"
@@ -168,8 +176,11 @@ cp "$SCRIPT_DIR/scripts/matugen-omarchy" "$BIN_DIR/"
 cp "$SCRIPT_DIR/scripts/matugen-watch" "$BIN_DIR/"
 cp "$SCRIPT_DIR/scripts/matugen-sync" "$BIN_DIR/"
 cp "$SCRIPT_DIR/scripts/matugen-frame" "$BIN_DIR/"
-chmod +x "$BIN_DIR/matugen-omarchy" "$BIN_DIR/matugen-watch" "$BIN_DIR/matugen-sync" "$BIN_DIR/matugen-frame"
-log_success "Helper scripts installed (matugen-omarchy, matugen-watch, matugen-sync, matugen-frame)"
+cp "$SCRIPT_DIR/scripts/matugen-add-live" "$BIN_DIR/"
+cp "$SCRIPT_DIR/scripts/matugen-silence" "$BIN_DIR/"
+chmod +x "$BIN_DIR/matugen-omarchy" "$BIN_DIR/matugen-watch" "$BIN_DIR/matugen-sync" "$BIN_DIR/matugen-frame" \
+  "$BIN_DIR/matugen-add-live" "$BIN_DIR/matugen-silence"
+log_success "Helper scripts installed (matugen-omarchy, matugen-watch, matugen-sync, matugen-frame, matugen-add-live, matugen-silence)"
 
 # 8. Install theme-set hook
 log_info "Installing Omarchy theme-set hook..."
