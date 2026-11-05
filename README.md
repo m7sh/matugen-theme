@@ -71,6 +71,14 @@ The repository ships 2560×1440 copies to keep the clone small. `install.sh` pla
 
 ## 📹 Live Wallpapers
 
+Live wallpapers are silent: the two clips shipped here have no audio track. OWE deliberately plays the audio of any video wallpaper that has one, so strip it before adding your own:
+
+```bash
+ffmpeg -i input.mp4 -map 0:v -c:v copy -an output.mp4
+```
+
+`-c:v copy` keeps the video stream bit-for-bit, so nothing is re-encoded.
+
 Omarchy 4.5 draws video backgrounds through OWE. Matugen still needs a still image, so the theme now resolves one automatically before every palette generation:
 
 1. **Poster image (recommended)** — put `foo.jpg`, `foo.png` or `foo.webp` next to `foo.mp4`. The poster wins and gives you a stable, hand-picked palette.
